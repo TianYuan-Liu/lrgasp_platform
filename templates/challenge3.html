@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenge 3</title>
+    <style>
+        /* Body styling */
+        html, body {
+          margin: 0;
+          padding: 0;
+          font-family: Arial, sans-serif;
+          overflow-x: hidden;
+          height: 100%;
+        }
+
+        /* Header styling */
+        header {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 220px;
+          width: 150%;
+          background: #126bf2;
+          margin-left: -320px;
+          margin-top: -24px;
+        }
+
+        footer {
+          text-align: center;
+          padding: 10px;
+          background-color: #333;
+          color: white;
+        }
+
+        body {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+        }
+
+        header h1 {
+          font-size: 128px;
+          color: white;
+          margin: 0;
+        }
+
+        /* Dropdown container styling */
+        .dropdown-container {
+          display: flex;
+          align-items: center;
+          justify-content: left;
+          margin-top: 100px;
+          margin-right: 1000px;
+        }
+
+        /* Label styling */
+        .dropdown-container label {
+          font-size: 20px;
+          color: #000000;
+        }
+
+        /* Dropdown styling */
+        .dropdown {
+          font-size: 16px;
+          padding: 5px;
+          width: 250px;
+          border-radius: 5px;
+          border: 1px solid #000000;
+          color: #6c6c6c;
+          margin-left: 20px;
+        }
+
+        /* Script runner container styling */
+        .script-runner {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-top: 10px;
+        }
+
+        /* File label styling */
+        .file-label {
+          font-size: 20px;
+          color: #000000;
+          margin-right: 5px;
+        }
+
+        /* New row for file upload elements */
+        .upload-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          transform: translate(-73px, 25px);
+        }
+
+        /* Label that acts as the file upload button */
+        .custom-file-upload {
+          display: inline-block;
+          padding: 3px;
+          font-size: 16px;
+          background-color: #fff7e9;
+          border: 1px solid black;
+          color: #353535;
+          border-radius: 5px;
+          cursor: pointer;
+          text-align: center;
+        }
+
+        /* File name display styling */
+        #file-name-display {
+          font-size: 16px;
+          padding: 3px;
+          background-color: white;
+          color: #6c6c6c;
+          border: 1px solid black;
+          border-radius: 5px;
+          width: 250px;
+        }
+
+        /* Run script button styling */
+        .script-runner button {
+          padding: 5px;
+          font-size: 16px;
+          background-color: #4CAF50;
+          border: 1px solid black;
+          color: white;
+          border-radius: 5px;
+          cursor: pointer;
+          margin-left: 50px;
+          width: 100px;
+        }
+
+        /* Overlay styling */
+        #overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        #progress-container {
+            background: white;
+            color: black;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        #progress-bar-container {
+            width: 80%;
+            background-color: #ddd;
+            margin: 20px auto;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0;
+            height: 20px;
+            background: #4CAF50;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
+<body>
+{% extends "base.html" %}
+{% block content %}
+<header>
+  <h1>Challenge 3</h1>
+</header>
+<main class="main-container">
+  <!-- Form to upload file and run the script -->
+  <div class="script-runner">
+    <form id="script-form" action="{{ url_for('run_script') }}" method="POST" enctype="multipart/form-data">
+      <div class="dropdown-container">
+        <label for="organism-dropdown">Organism: </label>
+        <select id="organism-dropdown" class="dropdown" name="organism" required>
+          <option value="" disabled selected>Choose organism...</option>
+          <option value="mouse">Mouse</option>
+          <option value="manatee">Manatee</option>
+        </select>
+      </div>
+
+      <div class="upload-row">
+        <span class="file-label">Transcriptome File:</span>
+        <div id="file-name-display">&nbsp;No file chosen...</div>
+        <label for="file-upload" class="custom-file-upload">Choose File</label>
+        <input type="file" id="file-upload" name="file" onchange="displayFileName()" hidden required>
+        <button type="button" onclick="start_progress(event)">Run Script</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Overlay (Hidden by Default) -->
+  <div id="overlay">
+      <div id="progress-container">
+          <h2>Running Script...</h2>
+          <div id="progress-bar-container">
+              <div id="progress-bar"></div>
+          </div>
+      </div>
+  </div>
+</main>
+
+<script>
+  const dropdown = document.getElementById('organism-dropdown');
+
+  // Change color to black only when an organism is selected
+  dropdown.addEventListener('change', function() {
+    dropdown.style.color = 'black';
+  });
+
+  // Display the selected file name
+  function displayFileName() {
+    const fileInput = document.getElementById('file-upload');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    fileNameDisplay.textContent = fileInput.files.length > 0 ? fileInput.files[0].name : "No file chosen";
+  }
+
+  function start_progress(event) {
+    event.preventDefault();  // Prevent default form submission
+
+    document.getElementById('overlay').style.display = 'flex';
+
+    // Collect form data
+    var formData = new FormData(document.getElementById('script-form'));
+
+    // Start the server-side process
+    $.ajax({
+        url: "/run_script",
+        type: "POST",
+        data: formData,
+        processData: false,  // Prevent jQuery from converting the data
+        contentType: false,  // Prevent jQuery from overriding the content type
+        success: function(response) {
+            console.log(response);
+
+            // Start receiving progress updates via SSE
+            const source = new EventSource("/progress_stream");
+            source.onmessage = function (event) {
+                const progress = parseInt(event.data, 10);
+
+                // Update the progress bar
+                document.getElementById("progress-bar").style.width = progress + "%";
+
+                if (progress >= 100) {
+                    // Close the SSE connection
+                    source.close();
+                    // Redirect to the results page
+                    window.location.href = "/challenge3_results";
+                }
+            };
+
+            source.onerror = function (event) {
+                source.close();
+            };
+        }
+    });
+}
+
+
+</script>
+
+{% endblock %}
+</body>
+</html>
