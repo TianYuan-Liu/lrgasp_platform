@@ -25,11 +25,13 @@ from csv import DictWriter, DictReader
 from multiprocessing import Process
 
 print(f'PROGRESS: {5}')
+status = 'Importing Modules...'
+print(f'STATUS: {status}')
 
 utilitiesPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "utilities")
 sys.path.insert(0, utilitiesPath)
 
-os.chdir("/Users/woutermaessen/Desktop/ConesaInternship/test")
+os.chdir("/Users/woutermaessen/PycharmProjects/lrgasp_platform/")
 
 
 from rt_switching import rts
@@ -699,6 +701,8 @@ def reference_parser(args, genome_chroms):
 
     referenceFiles = os.path.join(args.dir, "refAnnotation_" + args.output + ".genePred")
     print("**** Parsing Reference Transcriptome....", file=sys.stdout)
+    status = 'Parsing Reference Transcriptome...'
+    print(f'STATUS: {status}')
 
     if os.path.exists(referenceFiles):
         print("{0} already exists. Using it.".format(referenceFiles), file=sys.stdout)
@@ -2087,11 +2091,16 @@ def run(args):
                     r['RTS_junction'] = 'FALSE'
             fout_junc.writerow(r)
     # Run BUSCO analysis
+    status = 'Running BUSCO...'
+    print(f'STATUS: {status}')
     busco_tsv = run_BUSCO(corrFASTA, args.cpus, args.dir)
     ## Generating report
     print(f'PROGRESS: {85}')
+    status = 'Generating Report...'
+    print(f'STATUS: {status}')
     if not args.skip_report:
-        print("**** Generating SQANTI3 report....", file=sys.stderr)
+        print("**** Generating SQANTI3 report.... with", file=sys.stderr)
+        print(args.organism)
         rdata_out = os.path.join(os.path.abspath(args.dir), args.output + "_Rdata")
         experiment_id, entry_id, platform, organism = json_parser(args.experiment_json, args.entry_json)
         if os.path.exists(rdata_out):
@@ -2103,7 +2112,7 @@ def run(args):
         cmd = RSCRIPTPATH + " {d}/{f} {c} {j} {n} {d} {p} {o} {b} {s} ".format(d=utilitiesPath, f=RSCRIPT_REPORT,
                                                                                c=outputClassPath, j=outputJuncPath,
                                                                                n=experiment_id, p=platform, o=rdata_out,
-                                                                               b=busco_tsv, s=organism)
+                                                                               b=busco_tsv, s=args.organism)
         if subprocess.check_call(cmd, shell=True) != 0:
             print("ERROR running command: {0}".format(cmd), file=sys.stderr)
             sys.exit(-1)
@@ -2370,9 +2379,9 @@ def main():
     # arguments
     parser = argparse.ArgumentParser(description="Structural and Quality Annotation of Novel Transcript Isoforms")
 
-    #parser.add_argument('isoforms',
-                        #help='\tIsoforms (FASTA/FASTQ) or GTF format. Recommend provide GTF format with the --gtf option.')
-    #parser.add_argument('organism', help='\t\tOrganism Transcriptome -> used to determine corresponding reference Transcriptome')
+    parser.add_argument('isoforms',
+                        help='\tIsoforms (FASTA/FASTQ) or GTF format. Recommend provide GTF format with the --gtf option.')
+    parser.add_argument('organism', help='\t\tOrganism Transcriptome -> used to determine corresponding reference Transcriptome')
     #parser.add_argument('genome', help='\t\tReference genome (Fasta format)')
     parser.add_argument("--min_ref_len", type=int, default=0,
                         help="\t\tMinimum reference transcript length (default: 0 bp)")
@@ -2431,12 +2440,12 @@ def main():
                         required=False)
 
     args = parser.parse_args()
-    args.isoforms = next(
-        os.path.join("/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/uploads/", f)
-        for f in os.listdir("/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/uploads/")
-        if not f.endswith("renamed.fasta"))
+    #args.isoforms = next(
+    #    os.path.join("/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/uploads/", f)
+    #    for f in os.listdir("/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/uploads/")
+    #    if not f.endswith("renamed.fasta"))
     print('args.isoforms is:', args.isoforms)
-    args.organism = "mouse"
+    #args.organism = "mouse"
     args.genome = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/public_ref/lrgasp_grcm39_sirvs.fasta"
     args.skipORF = True
     os.chdir("/Users/woutermaessen/Desktop/ConesaInternship/test")
@@ -2521,6 +2530,8 @@ def main():
         print("Cleaned up isoform fasta file written to: {0}".format(args.isoforms), file=sys.stderr)
 
     if args.organism.endswith('mouse'):
+        path_to_gtf = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/public_ref/lrgasp_gencode_vM27_sirvs.gtf"
+    elif args.organism.endswith('manatee'):
         path_to_gtf = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/public_ref/lrgasp_gencode_vM27_sirvs.gtf"
     else:
         print(f"Organism name is {args.organism}, while 'mouse' or 'manatee' is expected")

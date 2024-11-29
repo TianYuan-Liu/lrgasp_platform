@@ -9,9 +9,11 @@ from utils import allowed_file, evaluate_submission
 import subprocess
 import threading
 from threading import Thread
+import json
 
 
 progress = 0
+status_message = "Booting Script..."
 
 @app.route("/")
 @app.route("/home")
@@ -95,55 +97,68 @@ def challenge3():
     return render_template("challenge3.html")
 
 @app.route('/run_script', methods=['POST'])
+@app.route("/run_script", methods=["POST"])
 def run_script():
-    global progress
-    progress = 0  # Reset progress
+    global progress, status_message
 
-    # Retrieve the file and other form data
+    # Reset progress and status message
+    progress = 0
+    status_message = "Starting Script..."
+
+    # Get file and organism from the request
     file = request.files.get('file')
     organism = request.form.get('organism')
 
-    # Save the uploaded file to the temporary upload folder
+    # Save the uploaded file
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(file_path)
 
-    # Start the script in a separate thread
+    # Run the script in a separate thread
     thread = Thread(target=run_script_process, args=(file_path, organism))
     thread.start()
 
-    # Return a JSON response immediately
-    return jsonify({'status': 'Script started'})
+    return jsonify({"status": "Script started successfully!"})
+
 
 def run_script_process(file_path, organism):
-    global progress
+    global progress, status_message
+
+    # Set initial status
+    status_message = f"Processing for organism: {organism}, isoform: {file_path}"
 
     # Define the path to the script
     script_path = "/Users/woutermaessen/PycharmProjects/lrgasp_platform/lrgasp_event2_metrics/sqanti3_lrgasp.challenge3.py"
 
     # Run the script
     try:
-        print('Script is Running')
-        process = subprocess.Popen(['python', script_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        print('Script is Running', organism, file_path)
+        process = subprocess.Popen(['python', script_path, file_path, organism],
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT,
+                                   text=True)
 
         for line in process.stdout:
             print(line.strip())
-            # Parse progress from output if possible
             if 'PROGRESS:' in line:
-                progress_str = line.strip().split('PROGRESS:')[1]
-                progress = int(progress_str)
+                progress = int(line.strip().split('PROGRESS:')[1])
                 print(f"Progress updated to {progress}%")
-        process.wait()
-        print('Script is Finished')
-        # After script finishes, set progress to 100
-        progress = 100
+            elif 'STATUS:' in line:
+                status_message = line.strip().split('STATUS:')[1].strip()
+                print(f"Status message updated to: {status_message}")
 
-        # Move the generated report to the static folder
+        process.wait()
+        progress = 100
+        status_message = 'Script Finished'
+
+        # Move the generated report
         source = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/output_Fabian/transcriptome_Evaluation_report.html"
         destination = "/Users/woutermaessen/PycharmProjects/lrgasp_platform/static/report.html"
         shutil.move(source, destination)
 
     except Exception as e:
-        print("Error running script:", str(e))
+        print(f"Error running script: {e}")
+        status_message = "Error running script"
+        progress = 100  # Ensure progress reaches 100 on error
 
 
 @app.route("/progress_stream")
@@ -152,12 +167,14 @@ def progress_stream():
     def generate():
         while True:
             global progress
+            global status_message
             time.sleep(0.5)  # Check progress every 500ms
-            yield f"data: {progress}\n\n"
+            data = json.dumps({'progress': progress, 'message': status_message})
+            yield f"data: {data}\n\n"
             if progress >= 100:
                 break
-
     return Response(generate(), mimetype="text/event-stream")
+
 
 
 @app.route('/challenge3_results')

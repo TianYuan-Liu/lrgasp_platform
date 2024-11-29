@@ -152,6 +152,7 @@
             padding: 20px;
             border-radius: 8px;
             text-align: center;
+            width:750px;
         }
 
         #progress-bar-container {
@@ -202,7 +203,7 @@
   <!-- Overlay (Hidden by Default) -->
   <div id="overlay">
       <div id="progress-container">
-          <h2>Running Script...</h2>
+          <h2 id="status-message">Booting Script...</h2>
           <div id="progress-bar-container">
               <div id="progress-bar"></div>
           </div>
@@ -225,49 +226,58 @@
     fileNameDisplay.textContent = fileInput.files.length > 0 ? fileInput.files[0].name : "No file chosen";
   }
 
+  // JavaScript to animate the progress bar and show the overlay
   function start_progress(event) {
-    event.preventDefault();  // Prevent default form submission
+      event.preventDefault();  // Prevent default form submission
 
-    document.getElementById('overlay').style.display = 'flex';
+      document.getElementById('overlay').style.display = 'flex';
 
-    // Collect form data
-    var formData = new FormData(document.getElementById('script-form'));
+      // Collect form data
+      var formData = new FormData(document.getElementById('script-form'));
 
-    // Start the server-side process
-    $.ajax({
-        url: "/run_script",
-        type: "POST",
-        data: formData,
-        processData: false,  // Prevent jQuery from converting the data
-        contentType: false,  // Prevent jQuery from overriding the content type
-        success: function(response) {
-            console.log(response);
+      // Add the selected organism to the form data
+      const selectedOrganism = document.getElementById('organism-dropdown').value;
+      formData.append('organism', selectedOrganism);
 
-            // Start receiving progress updates via SSE
-            const source = new EventSource("/progress_stream");
-            source.onmessage = function (event) {
-                const progress = parseInt(event.data, 10);
+      // Start the server-side process
+      $.ajax({
+          url: "/run_script",
+          type: "POST",
+          data: formData,
+          processData: false,  // Prevent jQuery from converting the data
+          contentType: false,  // Prevent jQuery from overriding the content type
+          success: function(response) {
+              console.log(response);
 
-                // Update the progress bar
-                document.getElementById("progress-bar").style.width = progress + "%";
+              // Start receiving progress updates via SSE
+              const source = new EventSource("/progress_stream");
+              source.onmessage = function (event) {
+                  const data = JSON.parse(event.data);
+                  const progress = data.progress;
+                  const message = data.message;
 
-                if (progress >= 100) {
-                    // Close the SSE connection
-                    source.close();
-                    // Redirect to the results page
-                    window.location.href = "/challenge3_results";
-                }
-            };
+                  // Update the progress bar
+                  document.getElementById("progress-bar").style.width = progress + "%";
 
-            source.onerror = function (event) {
-                source.close();
-            };
-        }
-    });
-}
+                  // Update the status message
+                  document.getElementById("status-message").textContent = message;
 
+                  if (progress >= 100) {
+                      // Close the SSE connection
+                      source.close();
+                      // Redirect to the results page
+                      window.location.href = "/challenge3_results";
+                  }
+              };
 
+              source.onerror = function (event) {
+                  source.close();
+              };
+          }
+      });
+  }
 </script>
+
 
 {% endblock %}
 </body>
