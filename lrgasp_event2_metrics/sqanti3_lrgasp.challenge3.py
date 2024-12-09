@@ -31,8 +31,6 @@ print(f'STATUS: {status}')
 utilitiesPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "utilities")
 sys.path.insert(0, utilitiesPath)
 
-os.chdir("/Users/woutermaessen/PycharmProjects/lrgasp_platform/")
-
 
 from rt_switching import rts
 from indels_annot import calc_indels_from_sam
@@ -59,32 +57,25 @@ except ImportError:
     print("Unable to import BCBio! Please make sure bcbiogff is installed.", file=sys.stderr)
     sys.exit(-1)
 
-sys.path.append('/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/')
+try:
+    from lrgasp_event2_metrics.utilities.cupcake.sequence.err_correct_w_genome import err_correct
+    from lrgasp_event2_metrics.utilities.cupcake.sequence.sam_to_gff3 import convert_sam_to_gff3
+    from lrgasp_event2_metrics.utilities.cupcake.sequence.STAR import STARJunctionReader
+    from lrgasp_event2_metrics.utilities.cupcake.sequence.BED import LazyBEDPointReader
+    import lrgasp_event2_metrics.utilities.cupcake.sequence.coordinate_mapper as cordmap
+except ImportError:
+    print(
+        "Unable to import err_correct_w_genome or sam_to_gff3.py! Please make sure cDNA_Cupcake/sequence/ is in $PYTHONPATH.")
+    sys.exit(-1)
 
-#try:
-from lrgasp_event2_metrics.utilities.cupcake.sequence.err_correct_w_genome import err_correct
-from lrgasp_event2_metrics.utilities.cupcake.sequence.sam_to_gff3 import convert_sam_to_gff3
-from lrgasp_event2_metrics.utilities.cupcake.sequence.STAR import STARJunctionReader
-from lrgasp_event2_metrics.utilities.cupcake.sequence.BED import LazyBEDPointReader
-#except ImportError:
-#    print(
-#        "Unable to import err_correct_w_genome or sam_to_gff3.py! Please make sure cDNA_Cupcake/sequence/ is in $PYTHONPATH.")
-#    sys.exit(-1)
-
-#try:
-from lrgasp_event2_metrics.utilities.cupcake.tofu.compare_junctions import compare_junctions
-from lrgasp_event2_metrics.utilities.cupcake.io.GFF import collapseGFFReader, write_collapseGFF_format
-#except ImportError:
-#    print("Unable to import cupcake.tofu! Please make sure you install cupcake.", file=sys.stderr)
-#    sys.exit(-1)
-
-# check cupcake version
-#from lrgasp_event2_metrics.utilities import cupcake
-
-#v1, v2 = [int(x) for x in cupcake.__version__.split('.')]
-#if v1 < 8 or v2 < 6:
-#    print("Cupcake version must be 8.6 or higher! Got {0} instead.".format(cupcake.__version__), file=sys.stderr)
-#    sys.exit(-1)
+try:
+    from cupcake.tofu.compare_junctions import compare_junctions
+    from cupcake.tofu.filter_away_subset import read_count_file
+    from cupcake.io.BioReaders import GMAPSAMReader
+    from cupcake.io.GFF import collapseGFFReader, write_collapseGFF_format
+except ImportError:
+    print("Unable to import cupcake.tofu! Please make sure you install cupcake.", file=sys.stderr)
+    sys.exit(-1)
 
 GMAP_CMD = "gmap --cross-species -n 1 --max-intronlength-middle=2000000 --max-intronlength-ends=2000000 -L 3000000 -f samse -t {cpus} -D {dir} -d {name} -z {sense} {i} | samtools view  -F2048 -h > {o}"
 # MINIMAP2_CMD = "minimap2 -ax splice --secondary=no -C5 -O6,24 -B4 -u{sense} -t {cpus} {g} {i} > {o}"
@@ -96,10 +87,6 @@ GMST_CMD = "perl " + GMSP_PROG + " -faa --strand direct --fnn --output {o} {i}"
 
 GTF2GENEPRED_PROG = os.path.join(utilitiesPath, "gtfToGenePred")
 
-# REMOVE
-current_directory = os.getcwd()
-print(f"The current working directory is: {current_directory}")
-
 GFFREAD_PROG = "gffread"
 
 if distutils.spawn.find_executable(GTF2GENEPRED_PROG) is None:
@@ -109,9 +96,9 @@ if distutils.spawn.find_executable(GFFREAD_PROG) is None:
     print("Cannot find executable {0}. Abort!".format(GFFREAD_PROG), file=sys.stderr)
     sys.exit(-1)
 
-seqid_rex1 = re.compile('PB\.(\d+)\.(\d+)$')
-seqid_rex2 = re.compile('PB\.(\d+)\.(\d+)\|\S+')
-seqid_fusion = re.compile("PBfusion\.(\d+)\.(\d+)\S*")
+seqid_rex1 = re.compile(r'PB\.(\d+)\.(\d+)$')
+seqid_rex2 = re.compile(r'PB\.(\d+)\.(\d+)\|\S+')
+seqid_fusion = re.compile(r"PBfusion\.(\d+)\.(\d+)\S*")
 
 FIELDS_JUNC = ['isoform', 'chrom', 'strand', 'junction_number', 'genomic_start_coord',
                'genomic_end_coord', 'transcript_coord', 'junction_category',
@@ -2100,7 +2087,6 @@ def run(args):
     print(f'STATUS: {status}')
     if not args.skip_report:
         print("**** Generating SQANTI3 report.... with", file=sys.stderr)
-        print(args.organism)
         rdata_out = os.path.join(os.path.abspath(args.dir), args.output + "_Rdata")
         experiment_id, entry_id, platform, organism = json_parser(args.experiment_json, args.entry_json)
         if os.path.exists(rdata_out):
@@ -2109,10 +2095,11 @@ def run(args):
         else:
             os.makedirs(rdata_out)
             rerun = True
-        cmd = RSCRIPTPATH + " {d}/{f} {c} {j} {n} {d} {p} {o} {b} {s} ".format(d=utilitiesPath, f=RSCRIPT_REPORT,
-                                                                               c=outputClassPath, j=outputJuncPath,
-                                                                               n=experiment_id, p=platform, o=rdata_out,
-                                                                               b=busco_tsv, s=args.organism)
+        cmd = RSCRIPTPATH + " {d}/{f} {c} {j} {d} {o} {b} {s} {t}your_tool {pl} {l} {da}".format(d=utilitiesPath, f=RSCRIPT_REPORT,
+                                                                               c=outputClassPath, j=outputJuncPath, o=rdata_out,
+                                                                               b=busco_tsv, s=args.organism, t=args.tool,
+                                                                               pl=args.platform, l=args.lib_prep,
+                                                                               da=args.data_cat)
         if subprocess.check_call(cmd, shell=True) != 0:
             print("ERROR running command: {0}".format(cmd), file=sys.stderr)
             sys.exit(-1)
@@ -2383,6 +2370,10 @@ def main():
                         help='\tIsoforms (FASTA/FASTQ) or GTF format. Recommend provide GTF format with the --gtf option.')
     parser.add_argument('organism', help='\t\tOrganism Transcriptome -> used to determine corresponding reference Transcriptome')
     #parser.add_argument('genome', help='\t\tReference genome (Fasta format)')
+    parser.add_argument('platform', help='\tPlatform that was used for the generation of the FASTA/FASTQ file. Default = PacBio')
+    parser.add_argument('lib_prep', help="\tThe library preparation for the sample. Default = cDNA.")
+    parser.add_argument('tool', help='\t Provide the name for your tool.')
+    parser.add_argument('data_cat', help="\t ?")
     parser.add_argument("--min_ref_len", type=int, default=0,
                         help="\t\tMinimum reference transcript length (default: 0 bp)")
     parser.add_argument("--force_id_ignore", action="store_true", default=True,
@@ -2440,17 +2431,19 @@ def main():
                         required=False)
 
     args = parser.parse_args()
-    #args.isoforms = next(
-    #    os.path.join("/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/uploads/", f)
-    #    for f in os.listdir("/Users/woutermaessen/PycharmProjects/lrgasp-challenge-3_benchmarking_docker/uploads/")
-    #    if not f.endswith("renamed.fasta"))
-    print('args.isoforms is:', args.isoforms)
-    #args.organism = "mouse"
-    args.genome = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/public_ref/lrgasp_grcm39_sirvs.fasta"
     args.skipORF = True
-    os.chdir("/Users/woutermaessen/Desktop/ConesaInternship/test")
 
-    print(f"Transcriptome file: {args.isoforms}, organism: {args.organism}, reference_genome: {args.genome}, is.skip-orf: {args.skipORF}" )
+    if args.organism == 'mouse':
+        args.genome = "LONGTrec_LRGASP_Platform/lrgasp_grcm39_sirvs.fasta"
+        args.coverage = "LONGTrec_LRGASP_Platform/gold_std_ES"
+        path_to_gtf = "LONGTrec_LRGASP_Platform/lrgasp_gencode_vM28_sirvs.mouse.gtf"
+    elif args.organism == 'manatee':
+        args.genome = "LONGTrec_LRGASP_Platform/lrgasp_manatee_sirv1.fasta"
+        args.coverage = "LONGTrec_LRGASP_Platform/gold_std_Manatee"
+        path_to_gtf = "LONGTrec_LRGASP_Platform/lrgasp_sirvs4.gtf"
+
+    os.chdir("sqanti_results")
+
     print("Current working directory:", os.getcwd())
 
     if args.experiment_json is None:
@@ -2507,7 +2500,9 @@ def main():
         print("ERROR: genome fasta {0} doesn't exist. Abort!".format(args.genome), file=sys.stderr)
         sys.exit()
 
-    args.isoforms = os.path.abspath(args.isoforms)
+    args.isoforms = next((os.path.join("uploads", file)
+                         for file in os.listdir("uploads")
+                         if file.endswith(".fasta") and not file.endswith(".renamed.fasta")), None)
     if not os.path.isfile(args.isoforms):
         print("ERROR: Input isoforms {0} doesn't exist. Abort!".format(args.isoforms), file=sys.stderr)
         sys.exit()
@@ -2529,12 +2524,8 @@ def main():
         args.isoforms = rename_isoform_seqids(args.isoforms, args.force_id_ignore)
         print("Cleaned up isoform fasta file written to: {0}".format(args.isoforms), file=sys.stderr)
 
-    if args.organism.endswith('mouse'):
-        path_to_gtf = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/public_ref/lrgasp_gencode_vM27_sirvs.gtf"
-    elif args.organism.endswith('manatee'):
-        path_to_gtf = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/public_ref/lrgasp_gencode_vM27_sirvs.gtf"
-    else:
-        print(f"Organism name is {args.organism}, while 'mouse' or 'manatee' is expected")
+
+
 
     if not os.path.isfile(path_to_gtf):
         print("ERROR: Annotation doesn't exist. Abort!".format(path_to_gtf), file=sys.stderr)
@@ -2559,7 +2550,7 @@ def main():
     with open(args.doc, 'w') as f:
         f.write("Version\t" + __version__ + "\n")
         f.write("Input\t" + os.path.basename(args.isoforms) + "\n")
-        f.write("Organism\t" + os.path.basename(path_to_gtf) + "\n")
+        f.write("Annotation\t" + os.path.basename(path_to_gtf) + "\n")
         f.write("Genome\t" + os.path.basename(args.genome) + "\n")
         f.write("Aligner\t" + args.aligner_choice + "\n")
         f.write("FLCount\t" + (os.path.basename(args.fl_count) if args.fl_count is not None else "NA") + "\n")

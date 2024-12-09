@@ -48,10 +48,10 @@
         /* Dropdown container styling */
         .dropdown-container {
           display: flex;
-          align-items: center;
-          justify-content: left;
-          margin-top: 100px;
-          margin-right: 1000px;
+          flex-direction: row;
+          align-items: flex-start;
+          gap: 15px;
+          margin-top: 20px;
         }
 
         /* Label styling */
@@ -60,15 +60,76 @@
           color: #000000;
         }
 
-        /* Dropdown styling */
-        .dropdown {
+        /* Default styling for all dropdowns */
+        .dropdown, .text-input {
           font-size: 16px;
           padding: 5px;
           width: 250px;
           border-radius: 5px;
           border: 1px solid #000000;
           color: #6c6c6c;
-          margin-left: 20px;
+        }
+
+        /* Specific Styling for Organism Dropdown */
+        .organism-dropdown-container {
+          margin-left: 0; /* Move the entire container to the right */
+          transform: translate(-130px, 60px);
+        }
+
+        /* Styling for Tool Name Input Box */
+        .tool-name-container {
+          margin-left: 581px;
+        }
+
+        .tool-name-container .text-input{
+          color: black;
+        }
+
+        .tool-name-container .text-input::placeholder {
+        color: black; /* Sets the placeholder text color */
+        opacity: 1;   /* Ensures the placeholder is fully opaque */
+        }
+
+        /* Styling for Platform Dropdown */
+        .platform-dropdown-container {
+          margin-left: 600px;
+        }
+
+        .platform-dropdown-container .dropdown{
+          color: black;
+        }
+
+        .platform-dropdown-container .dropdown::placeholder{
+          color: black;
+          opacity: 1;
+        }
+
+        /* Styling for Library Preparation Dropdown */
+        .library-dropdown-container {
+          margin-left: 508px;
+        }
+
+        .library-dropdown-container .dropdown{
+          color: black;
+        }
+
+        .library-dropdown-container .dropdown::placeholder{
+          color: black;
+          opacity: 1;
+        }
+
+        /* Styling for Data Category Dropdown */
+        .data-category-container {
+          margin-left: 548px;
+        }
+
+        .data-category-container .dropdown{
+          color: black;
+        }
+
+        .data-category-container .dropdown::placeholder{
+          color: black;
+          opacity: 1;
         }
 
         /* Script runner container styling */
@@ -91,7 +152,7 @@
           display: flex;
           align-items: center;
           gap: 10px;
-          transform: translate(-73px, 25px);
+          transform: translate(-207px, -135px);
         }
 
         /* Label that acts as the file upload button */
@@ -181,12 +242,50 @@
   <!-- Form to upload file and run the script -->
   <div class="script-runner">
     <form id="script-form" action="{{ url_for('run_script') }}" method="POST" enctype="multipart/form-data">
-      <div class="dropdown-container">
+      <!-- Organism Dropdown -->
+      <div class="dropdown-container organism-dropdown-container">
         <label for="organism-dropdown">Organism: </label>
         <select id="organism-dropdown" class="dropdown" name="organism" required>
           <option value="" disabled selected>Choose organism...</option>
           <option value="mouse">Mouse</option>
           <option value="manatee">Manatee</option>
+        </select>
+      </div>
+
+        <!-- Tool Name Input Box -->
+      <div class="dropdown-container tool-name-container">
+        <label for="tool-input">Tool Name: </label>
+        <input type="text" id="tool-input" class="text-input" name="tool" placeholder="your_tool">
+      </div>
+
+      <!-- Platform Dropdown -->
+      <div class="dropdown-container platform-dropdown-container">
+        <label for="platform-dropdown">Platform: </label>
+        <select id="platform-dropdown" class="dropdown" name="platform" required>
+          <option value="PacBio" selected>PacBio</option>
+          <option value="ONT">Oxford Nanopore Technologies</option>
+        </select>
+      </div>
+
+      <!-- Library Preparation Dropdown -->
+      <div class="dropdown-container library-dropdown-container">
+        <label for="library-dropdown">Library Preparation: </label>
+        <select id="library-dropdown" class="dropdown" name="library_preparation" required>
+          <option value="cDNA" selected>cDNA</option>
+          <option value="direct RNA">direct RNA</option>
+          <option value="R2C2">R2C2</option>
+          <option value="CapTrap">CapTrap</option>
+        </select>
+      </div>
+
+      <!-- Data Category Dropdown -->
+      <div class="dropdown-container data-category-container">
+        <label for="data-category-dropdown">Data Category: </label>
+        <select id="data-category-dropdown" class="dropdown" name="data_category" required>
+          <option value="NA" selected>NA</option>
+          <option value="LS">LS</option>
+          <option value="SO">SO</option>
+          <option value="LO">LO</option>
         </select>
       </div>
 
@@ -223,7 +322,14 @@
   function displayFileName() {
     const fileInput = document.getElementById('file-upload');
     const fileNameDisplay = document.getElementById('file-name-display');
-    fileNameDisplay.textContent = fileInput.files.length > 0 ? fileInput.files[0].name : "No file chosen";
+
+    if (fileInput.files.length > 0) {
+      fileNameDisplay.textContent = fileInput.files[0].name;
+      fileNameDisplay.style.color = 'black'; // Change text color to black
+    } else {
+      fileNameDisplay.textContent = "No file chosen";
+      fileNameDisplay.style.color = '#6c6c6c'; // Reset text color to default gray
+    }
   }
 
   // JavaScript to animate the progress bar and show the overlay
@@ -238,6 +344,19 @@
       // Add the selected organism to the form data
       const selectedOrganism = document.getElementById('organism-dropdown').value;
       formData.append('organism', selectedOrganism);
+
+      const selectedPlatform = document.getElementById('platform-dropdown').value;
+      formData.append('platform', selectedPlatform);
+
+      const selectedLibrary = document.getElementById('library-dropdown').value;
+      formData.append('library_preparation', selectedLibrary);
+
+      const toolInputElement = document.getElementById('tool-input');
+      const toolName = toolInputElement.value.trim() === '' ? 'your_tool' : toolInputElement.value.trim();
+      formData.append('tool', toolName);
+
+      const selectedDataCategory = document.getElementById('data-category-dropdown').value;
+      formData.append('data_category', selectedDataCategory);
 
       // Start the server-side process
       $.ajax({

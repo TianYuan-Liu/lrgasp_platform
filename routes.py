@@ -96,7 +96,6 @@ def data():
 def challenge3():
     return render_template("challenge3.html")
 
-@app.route('/run_script', methods=['POST'])
 @app.route("/run_script", methods=["POST"])
 def run_script():
     global progress, status_message
@@ -105,37 +104,43 @@ def run_script():
     progress = 0
     status_message = "Starting Script..."
 
-    # Get file and organism from the request
+    # Get file and form data from the request
     file = request.files.get('file')
     organism = request.form.get('organism')
+    platform = request.form.get('platform')
+    library_preparation = request.form.get('library_preparation')
+    tool = request.form.get('tool')  # Default to 'your_tool' if not providedor
+    data_category = request.form.get('data_category')  # Default to 'NA' if not provided
 
     # Save the uploaded file
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(file_path)
 
-    # Run the script in a separate thread
-    thread = Thread(target=run_script_process, args=(file_path, organism))
+    # Run the script in a separate thread with the additional parameters
+    thread = Thread(target=run_script_process, args=(file_path, organism, platform, library_preparation, tool, data_category))
     thread.start()
 
     return jsonify({"status": "Script started successfully!"})
 
 
-def run_script_process(file_path, organism):
+def run_script_process(file_path, organism, platform, library_preparation, tool, data_category):
     global progress, status_message
 
     # Set initial status
-    status_message = f"Processing for organism: {organism}, isoform: {file_path}"
+    status_message = f"Processing for organism: {organism}, platform: {platform}, library: {library_preparation}, tool: {tool}, category: {data_category}"
 
     # Define the path to the script
-    script_path = "/Users/woutermaessen/PycharmProjects/lrgasp_platform/lrgasp_event2_metrics/sqanti3_lrgasp.challenge3.py"
+    script_path = "lrgasp_event2_metrics/sqanti3_lrgasp.challenge3.py"
 
     # Run the script
     try:
-        print('Script is Running', organism, file_path)
-        process = subprocess.Popen(['python', script_path, file_path, organism],
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT,
-                                   text=True)
+        print('Script is Running with parameters:', 'org:', organism, ' platform:', platform, ' Lib prep:',library_preparation, ' Tool name:' ,tool, ' Data Cat:',data_category)
+        process = subprocess.Popen(
+            ['python', script_path, file_path, organism, platform, library_preparation, tool, data_category],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
 
         for line in process.stdout:
             print(line.strip())
@@ -151,8 +156,8 @@ def run_script_process(file_path, organism):
         status_message = 'Script Finished'
 
         # Move the generated report
-        source = "/Users/woutermaessen/Downloads/lrgasp-challenge-3_benchmarking_workflow-main/lrgasp-challenge-3_full_data/output_Fabian/transcriptome_Evaluation_report.html"
-        destination = "/Users/woutermaessen/PycharmProjects/lrgasp_platform/static/report.html"
+        source = "sqanti_results/rna_Evaluation_report.html"
+        destination = "lrgasp_platform/static/report.html"
         shutil.move(source, destination)
 
     except Exception as e:
